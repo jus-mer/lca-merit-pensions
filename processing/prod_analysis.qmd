@@ -342,11 +342,12 @@ a5 <- db$pref_effort_d
 a6 <- db$pref_talent_d 
 a7 <- db$pref_rich_parents_d
 a8 <- db$pref_contact_d
+id <- db$id
 
-db_lca <- data.frame(a1, a2, a3, a4, a5, a6, a7, a8) %>% na.omit()
+db_lca <- data.frame(id, a1, a2, a3, a4, a5, a6, a7, a8) %>% na.omit() %>% as_tibble()
 
 db_lca <- db_lca %>% 
-  mutate_all(~as.factor(.))
+  mutate_at(.vars = 2:9, ~as.factor(.))
 
 f <-cbind(a1, a2, a3, a4, a5, a6, a7, a8)~1
 
@@ -628,198 +629,71 @@ report_probs2[,-c(1)] %>%
                             font_size = 23)
 ```
 
- The @tbl-prevalence shows the conditional probabilities of each item associated with a latent class and their respective sizes. Class one has a size of 36.3% and shows low probabilities of perceiving meritocratic norms in society, while it highly perceives non-meritocratic functions. In addition, there is a high preference for both meritocratic and non-meritocratic elements, with talent being the only factor that deviates slightly from this pattern. In short, this class does not perceive a meritocratic functioning in society, and at the same time adheres to both meritocratic and non-meritocratic factors. This class is referred to as “**Anything goes preferences**.”
+The @tbl-prevalence shows the conditional probabilities of each item associated with a latent class and their respective sizes. Class one has a size of 36.3% and shows low probabilities of perceiving meritocratic norms in society, while it highly perceives non-meritocratic functions. In addition, there is a high preference for both meritocratic and non-meritocratic elements, with talent being the only factor that deviates slightly from this pattern. In short, this class does not perceive a meritocratic functioning in society, and at the same time adheres to both meritocratic and non-meritocratic factors. This class is referred to as “**Anything goes preferences**.”
 
 In the second class, there is a high perception of meritocratic elements and conditions of origin at the societal level. On the other hand, there is a strong preference for effort and talent, which differs from a lower adherence to non-meritocratic rules. In this case, there is a panoramic view of how society works, where effort and talent coexist with non-meritocratic functions; however, people prefer to be rewarded primarily for their merit. This group includes “**Meritocratic believers with a broad perspective**.”
 
 The fourth class shows almost no perception of meritocratic norms in society, while perceiving a social order mainly governed by conditions of origin. In relation to this, preferences show a high adherence to the idea that society should function on the basis of meritocratic elements (although effort rather than talent), but having rich parents and good contacts should not influence the distribution of rewards in society. In this context, there is a clear narrative where, perceiving that society operates on the basis of non-meritocratic elements, there is a preference for meritocracy to come into play. This class is designated as “**Radical meritocrats**.”
 
-## Four-versus-three latent class model
+# Regression anlaysis
 
 ```{r}
-#| label: tbl-comparision
-#| tbl-cap: "Fit comparision four-versus-three latent class model"
-#| tbl-cap-location: top
+#| label: fig-reg
+#| out-width: '80%'
+#| fig-asp: 0.8
+#| fig-cap: "Market justice preferences in pensions by latent class of meritocracy (MAP model)"
+#| fig-cap-location: top
 
-# Compare K=3 vs K=4 (poLCA): fit, sizes/separation, item profiles --------------
-
-fit3 <- fits[[3]]
 fit4 <- fits[[4]]
 
-# ---- 1) Fit comparison (already in your fit_tbl_report, but make it explicit)
+post <- as.data.frame(fit4$posterior)
+names(post) <- paste0("p_class", 1:4)
 
-fit_comp <- tibble(
-  K = c(3, 4),
-  N = nrow(db_lca),
-  logLik = c(fit3$llik, fit4$llik),
-  npar   = c(fit3$npar, fit4$npar),
-  AIC    = c(fit3$aic,  fit4$aic),
-  BIC    = c(fit3$bic,  fit4$bic)
-) %>%
-  arrange(K) %>%
+class_df <- db_lca %>%
+  dplyr::select(id) %>%
+  bind_cols(post) %>%
   mutate(
-    dAIC = AIC - lag(AIC),
-    dBIC = BIC - lag(BIC),
-    LRT  = 2 * (logLik - lag(logLik)),
-    df_LRT = npar - lag(npar),
-    p_LRT  = ifelse(df_LRT > 0, pchisq(LRT, df=df_LRT, lower.tail=FALSE), NA_real_)
+    class_hat = max.col(dplyr::select(., starts_with("p_class"))),
+    class_hat = factor(class_hat)
   )
 
-fit_comp %>% 
-   kableExtra::kable(format = "html",
-                    align = "c",
-                    booktabs = T,
-                    escape = F,
-                    caption = NULL) %>%
-  kableExtra::kable_styling(full_width = T,
-                            latex_options = "hold_position",
-                            bootstrap_options=c("striped", "bordered", "condensed"),
-                            font_size = 23)
+db_full <- db %>%
+  left_join(class_df, by = "id")
 
+P <- fits[[4]]$posterior
+max_p <- apply(P, 1, max)
+#summary(max_p)
+#quantile(max_p, c(.1, .25, .5, .75, .9))
 
-```
+# MAP (ref=2)
+db_reg1 <- db_full %>% filter(!is.na(class_hat), !is.na(just_pension))
+db_reg1$class_hat <- relevel(db_reg1$class_hat, ref = "2")
+m_map <- lm(just_pension ~ class_hat, data = db_reg1)
 
-```{r}
-#| label: fig-comparprob
-#| out-width: '80%'
-#| fig-asp: 0.8
-#| fig-cap: "Probabilities by model"
-#| fig-cap-location: top
-# ---- 2) Class size + separation diagnostics
+# Posterior (ref implícita = clase 2)
+db_reg2 <- db_full %>% filter(!is.na(p_class2), !is.na(just_pension))
+m_post <- lm(just_pension ~ p_class1 + p_class3 + p_class4, data = db_reg2)
 
-sep_diag <- function(fit) {
-  P <- fit$posterior
-  K <- ncol(P)
-  class_hat <- max.col(P)
-  max_p <- apply(P, 1, max)
-  
-  avg_diag <- vapply(1:K, function(k) {
-    idx <- which(class_hat == k)
-    if (length(idx) == 0) NA_real_ else mean(P[idx, k])
-  }, numeric(1))
-  
-  tibble(
-    K = K,
-    min_class_prior = min(fit$P),
-    class_prior = paste0(round(100 * fit$P, 1), collapse = " / "),
-    mean_max_p = mean(max_p),
-    p10_max_p  = unname(quantile(max_p, 0.10)),
-    avg_diag_min  = suppressWarnings(min(avg_diag, na.rm = TRUE)),
-    avg_diag_mean = mean(avg_diag, na.rm = TRUE)
+coef_df <-
+  broom::tidy(m_map, conf.int = TRUE) %>%
+    mutate(model = "MAP (dummies; ref=Class 4)") %>%
+    filter(term != "(Intercept)") %>%
+    mutate(
+      contrast = case_when(
+        term == "class_hat1" ~ "Class 1 vs 2",
+        term == "class_hat3" ~ "Class 3 vs 2",
+        term == "class_hat4" ~ "Class 4 vs 2",
+        TRUE ~ term
+      )) %>%
+  mutate(
+    contrast = factor(contrast, levels = c("Class 1 vs 2", "Class 3 vs 2", "Class 4 vs 2"))
   )
-}
 
-# determine endorsement category from your factors
-endorsement_level <- tail(levels(db_lca$a1), 1)
-
-get_p_endorse <- function(fit, endorsement_level) {
-  items <- names(fit$probs)
-  
-  probs_long <- bind_rows(lapply(items, function(item) {
-    mat <- fit$probs[[item]]              # K x 2 (dichotomous)
-    df <- as.data.frame(mat)
-    df$class <- 1:nrow(mat)
-    df$item <- item
-    df
-  })) %>%
-    pivot_longer(cols = -c(class, item), names_to = "category", values_to = "prob") %>%
-    mutate(class = as.integer(class), prob = as.numeric(prob)) %>%
-    filter(category == endorsement_level) %>%
-    transmute(item, class, p = prob)
-  
-  probs_long
-}
-
-p3 <- get_p_endorse(fit3, endorsement_level) %>% mutate(K = 3)
-p4 <- get_p_endorse(fit4, endorsement_level) %>% mutate(K = 4)
-
-# Plot profiles for each solution
-compare <- bind_rows(p3, p4) %>% 
-  mutate(
-    variable = case_when(item == "a1" ~ "perc_effort",
-                         item == "a2" ~ "perc_talent",
-                         item == "a3" ~ "perc_rich_parents",
-                         item == "a4" ~ "perc_contacts",
-                         item == "a5" ~ "pref_effort",
-                         item == "a6" ~ "pref_talent",
-                         item == "a7" ~ "pref_rich_parents",
-                         item == "a8" ~ "pref_contacts"
-                         ),
-    variable = factor(variable,
-                      levels = c("perc_effort",
-"perc_talent",
-"perc_rich_parents",
-"perc_contacts",
-"pref_effort",
-"pref_talent",
-"pref_rich_parents",
-"pref_contacts"))) 
-
-
-compare %>% 
-  ggplot(aes(x = variable, y = p, group = factor(class), colour = factor(class))) +
-  geom_line(linewidth = 0.7) +
-  geom_point(size = 2) +
-  coord_cartesian(ylim = c(0, 1)) +
-    facet_wrap(~K, ncol = 1) +
-  labs(x = "Item", y = paste0("P(Y = ", "High", " | class)"), group = "Class", colour = "Class") +
-  theme(legend.position = "bottom",
-        text = element_text(size = 14),
-        axis.text.x = element_text(angle = 70, vjust = 1, hjust = 1))
-  
-```
-
-```{r}
-#| label: fig-heatcomparado
-#| out-width: '80%'
-#| fig-asp: 0.8
-#| fig-cap: "Heatmap by model"
-#| fig-cap-location: top
-# Heatmap for each solution
-ggplot(compare,
-       aes(x = variable, y = factor(class), fill = p)) +
-  geom_tile() +
-  facet_wrap(~K, ncol = 1) +
-  labs(x = "Item", y = "Class", fill = "P(endorse)") +
-  theme(legend.position = "right",
-        text = element_text(size = 14),
-        axis.text.x = element_text(angle = 70, vjust = 1, hjust = 1))
-
-```
-
-```{r}
-#| eval: false
-#| include: false
-
-# ---- 4) "Marginal value" of the 4th class: does K=4 split an existing class?
-
-# Compare class-mean profiles by looking at within-solution dispersion across classes for each item.
-# If K=4 increases dispersion for some items, it adds differentiation.
-
-disp_by_item <- function(p_df) {
-  p_df %>%
-    group_by(item) %>%
-    summarise(sd_across_classes = sd(p), range_across_classes = max(p) - min(p), .groups="drop")
-}
-
-disp3 <- disp_by_item(p3) %>% dplyr::rename(sd3 = sd_across_classes, range3 = range_across_classes)
-disp4 <- disp_by_item(p4) %>% dplyr::rename(sd4 = sd_across_classes, range4 = range_across_classes)
-
-disp_comp <- disp3 %>%
-  left_join(disp4, by="item") %>%
-  mutate(
-    d_sd = sd4 - sd3,
-    d_range = range4 - range3
-  ) %>%
-  arrange(desc(d_range))
-
-disp_comp
-
-# Quick plot: which items gain most differentiation when moving 3 -> 4 classes?
-ggplot(disp_comp, aes(x = reorder(item, d_range), y = d_range)) +
-  geom_point() +
-  coord_flip() +
-  labs(x = "Item", y = "Increase in range across classes (K=4 minus K=3)") 
-
+ggplot(coef_df, aes(x = estimate, y = contrast)) +
+  geom_vline(xintercept = 0, linewidth = 0.7, color = "grey60", linetype = "dashed") +
+  geom_pointrange(aes(xmin = conf.low, xmax = conf.high), fatten = 2, 
+                  size = 1, color = "#ca1137") + 
+  labs(x = "Coefficient (OLS) with 95% CI", y = NULL) +
+  theme(text = element_text(size = 14))
 ```
 
