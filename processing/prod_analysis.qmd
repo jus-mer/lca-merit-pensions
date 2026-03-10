@@ -628,6 +628,12 @@ report_probs2[,-c(1)] %>%
                             font_size = 23)
 ```
 
+ The @tbl-prevalence shows the conditional probabilities of each item associated with a latent class and their respective sizes. Class one has a size of 36.3% and shows low probabilities of perceiving meritocratic norms in society, while it highly perceives non-meritocratic functions. In addition, there is a high preference for both meritocratic and non-meritocratic elements, with talent being the only factor that deviates slightly from this pattern. In short, this class does not perceive a meritocratic functioning in society, and at the same time adheres to both meritocratic and non-meritocratic factors. This class is referred to as “**Anything goes preferences**.”
+
+In the second class, there is a high perception of meritocratic elements and conditions of origin at the societal level. On the other hand, there is a strong preference for effort and talent, which differs from a lower adherence to non-meritocratic rules. In this case, there is a panoramic view of how society works, where effort and talent coexist with non-meritocratic functions; however, people prefer to be rewarded primarily for their merit. This group includes “**Meritocratic believers with a broad perspective**.”
+
+The fourth class shows almost no perception of meritocratic norms in society, while perceiving a social order mainly governed by conditions of origin. In relation to this, preferences show a high adherence to the idea that society should function on the basis of meritocratic elements (although effort rather than talent), but having rich parents and good contacts should not influence the distribution of rewards in society. In this context, there is a clear narrative where, perceiving that society operates on the basis of non-meritocratic elements, there is a preference for meritocracy to come into play. This class is designated as “**Radical meritocrats**.”
+
 ## Four-versus-three latent class model
 
 ```{r}
