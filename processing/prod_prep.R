@@ -41,7 +41,11 @@ db <- data %>%
                 pref_talent = merit_06, 
                 pref_rich_parents = merit_07, 
                 pref_contact = merit_08,
-                just_pension = des_11) %>% 
+                just_pension = des_11,
+                income = carac_a10, 
+                age = screen_age,
+                sex = screen_sex,
+                educ = screen_education) %>% 
   mutate(id = 1:nrow(.)) %>% 
   as_tibble()
 
@@ -51,11 +55,31 @@ db <- data %>%
 db <- db %>% 
   mutate(
     across(
-      .cols = -c(id),
+      .cols = -c(id, age),
       .fns = ~ set_na(., na = c(5,6))
     )
   )
 
+# Age
+frq(db$age) #ok
+
+# Educ
+frq(db$educ)#ok
+
+db$educ_f <- as.factor(db$educ)
+
+# Sex
+frq(db$sex)
+
+db <- db %>% 
+  mutate(sex = if_else(sex >= 3, NA, sex),
+         sex = as.factor(sex)
+  )
+
+# Income
+frq(db$income)
+
+db$income <- factor(db$income) #recategorizar
 
 # meritocracy
 
@@ -79,7 +103,7 @@ db <- db %>%
 db <- db %>% 
   mutate(across(
     1:8,
-    ~ if_else(. >= 3, 1L, 0L),
+    ~ if_else(. >= 3, 1, 0),
     .names = "{.col}_d"   # perc_effort -> perc_effort_d, etc.
   ))
 
@@ -101,7 +125,7 @@ db <- db %>%
 
 
 db <- db %>% 
-  mutate_at(.vars = 11:18,
+  mutate_at(.vars = 16:23,
             .funs = ~ factor(., 
                              levels = 0:1, 
                              labels = c("Low", "High")))
@@ -192,6 +216,6 @@ db$pref_contact_d <- sjlabelled::set_label(db$pref_contact_d,
 # 4. Save and export ------------------------------------------------------
 
 db <- db %>% 
-  dplyr::select(id, just_pension, starts_with(c("perc", "pref")))
+  dplyr::select(id, just_pension, starts_with(c("perc", "pref")), age, sex, educ, income)
 
 save(db, file = here("input/data/proc/db_proc.RData"))

@@ -104,10 +104,17 @@ glimpse(db)
 #| tbl-cap: "Descriptive statistics"
 #| tbl-cap-location: top
 
-
+vars_m <- c("perc_effort",
+            "perc_talent",
+            "perc_rich_parents",
+            "perc_contact",
+            "pref_effort",
+            "pref_talent",
+            "pref_rich_parents",
+            "pref_contact")
 
 t1 <- db %>% 
-   dplyr::select(c(3:6, 11:14, 7:10, 15:18))
+   dplyr::select(all_of(vars_m), ends_with("_d"))
 
 
 df<-dfSummary(t1,
@@ -136,19 +143,12 @@ print(df, method="render")
 #| fig-cap: "Distribution of responses on the scale of perceptions and preferences regarding meritocracy"
 #| fig-cap-location: top
 
-
-vars_m <- c("perc_effort",
-            "perc_talent",
-            "perc_rich_parents",
-            "perc_contact",
-            "pref_effort",
-            "pref_talent",
-            "pref_rich_parents",
-            "pref_contact")
-
-
 db <- db %>% 
-  mutate_all(~as.numeric(.))
+  mutate(
+    across(
+      .cols = all_of(vars_m),
+      .fns = ~as.numeric(.)
+    ))
  
 labels1 <- c("Strongly desagree" = 1, 
              "Desagree" = 2, 
@@ -334,17 +334,21 @@ min_class_share <- function(fit) {
 #| include: false
 # 3.3 LCA: dichotomized items ----
 
-a1 <- db$perc_effort_d
-a2 <- db$perc_talent_d
-a3 <- db$perc_rich_parents_d
-a4 <- db$perc_contact_d
-a5 <- db$pref_effort_d
-a6 <- db$pref_talent_d 
-a7 <- db$pref_rich_parents_d
-a8 <- db$pref_contact_d
-id <- db$id
+df <- db %>% 
+  dplyr::select(id, ends_with("_d")) %>% 
+  na.omit()
 
-db_lca <- data.frame(id, a1, a2, a3, a4, a5, a6, a7, a8) %>% na.omit() %>% as_tibble()
+a1 <- df$perc_effort_d
+a2 <- df$perc_talent_d
+a3 <- df$perc_rich_parents_d
+a4 <- df$perc_contact_d
+a5 <- df$pref_effort_d
+a6 <- df$pref_talent_d 
+a7 <- df$pref_rich_parents_d
+a8 <- df$pref_contact_d
+id <- df$id
+
+db_lca <- data.frame(id, a1, a2, a3, a4, a5, a6, a7, a8) %>% as_tibble()
 
 db_lca <- db_lca %>% 
   mutate_at(.vars = 2:9, ~as.factor(.))
@@ -386,7 +390,6 @@ fit_tbl
 N_used <- nrow(db_lca)
 
 m_patterns <- n_patterns_from_data(db_lca)  # scalar
-
 
 # Robust extractors (avoid list-columns)
 get_K <- function(fit) as.integer(ncol(fit$posterior))  # classes = cols of posterior
@@ -528,14 +531,13 @@ probs_long <- bind_rows(lapply(names(fit4$probs), function(item) {
     prob = as.numeric(prob)
   )
 
-
 # If levels are c("0","1") or c("1","2") you'll want the "higher"/"yes" one.
 # Here I will assume endorsement is the LAST level (most common after dichotomization).
 endorsement_level <- tail(levels(db_lca$a1), 1)
 
 # 4) Build a clean table: P(endorsement | class) for each item
 p_endorse <- probs_long %>%
-  filter(category == endorsement_level) %>%
+  filter(category == "Pr(2)") %>%
   dplyr::select(item, class, p = prob) %>%
   mutate(item = factor(item, levels = names(fit4$probs)))
 
@@ -638,18 +640,14 @@ The fourth class shows almost no perception of meritocratic norms in society, wh
 # Regression anlaysis
 
 ```{r}
-#| label: fig-reg
-#| out-width: '80%'
-#| fig-asp: 0.8
-#| fig-cap: "Market justice preferences in pensions by latent class of meritocracy (MAP model)"
-#| fig-cap-location: top
+#| include: false
 
 fit4 <- fits[[4]]
 
 post <- as.data.frame(fit4$posterior)
 names(post) <- paste0("p_class", 1:4)
 
-class_df <- db_lca %>%
+class_df <- na.omit(db_lca) %>%
   dplyr::select(id) %>%
   bind_cols(post) %>%
   mutate(
@@ -660,33 +658,85 @@ class_df <- db_lca %>%
 db_full <- db %>%
   left_join(class_df, by = "id")
 
+db_full$just_pension <- as.numeric(db_full$just_pension)
+db_full$just_pension <- if_else(db_full$just_pension >= 3, 1, 0)
+
 P <- fits[[4]]$posterior
 max_p <- apply(P, 1, max)
 #summary(max_p)
 #quantile(max_p, c(.1, .25, .5, .75, .9))
 
 # MAP (ref=2)
-db_reg1 <- db_full %>% filter(!is.na(class_hat), !is.na(just_pension))
-db_reg1$class_hat <- relevel(db_reg1$class_hat, ref = "2")
-m_map <- lm(just_pension ~ class_hat, data = db_reg1)
+db_reg1 <- db_full %>% filter(!is.na(class_hat), !is.na(just_pension), !is.na(age), !is.na(sex), !is.na(educ), !is.na(income))
+
+db_reg1 <- db_reg1 %>% 
+  mutate(
+    income_4 = case_when(
+      income %in% c(
+        "Menos de $280.000 mensuales liquidos",
+        "De $280.001 a $380.000 mensuales liquidos",
+        "De $380.001 a $470.000 mensuales liquidos"
+      ) ~ "Bajo",
+      
+      income %in% c(
+        "De $470.001 a $610.000 mensuales liquidos",
+        "De $610.001 a $730.000 mensuales liquidos"
+      ) ~ "Medio-bajo",
+      
+      income %in% c(
+        "De $730.001 a $890.000 mensuales liquidos",
+        "De $890.001 a $1.100.000 mensuales liquidos"
+      ) ~ "Medio-alto",
+      
+      income %in% c(
+        "De $1.100.001 a $2.700.000 mensuales liquidos",
+        "De $2.700.001 a $4.100.000 mensuales liquidos",
+        "Mas de $4.100.001 mensuales liquidos"
+      ) ~ "Alto",
+      
+      TRUE ~ NA_character_
+    ),
+    income_4 = factor(income_4, levels = c("Bajo", "Medio-bajo", "Medio-alto", "Alto"))
+  )
+
+db_reg1$class_hat <- relevel(db_reg1$class_hat, ref = "4")
+
+m1 <- lm(just_pension ~ class_hat, data = db_reg1)
+m2 <- lm(just_pension ~ class_hat + age, data = db_reg1)
+m3 <- lm(just_pension ~ class_hat + age + sex, data = db_reg1)
+m4 <- lm(just_pension ~ class_hat + age + sex + educ, data = db_reg1)
+m5 <- lm(just_pension ~ class_hat + age + sex + educ + income_4, data = db_reg1)
+m6 <- lm(just_pension ~ class_hat*income_4 + age + sex + educ, data = db_reg1)
 
 # Posterior (ref implícita = clase 2)
-db_reg2 <- db_full %>% filter(!is.na(p_class2), !is.na(just_pension))
-m_post <- lm(just_pension ~ p_class1 + p_class3 + p_class4, data = db_reg2)
+#db_reg2 <- db_full %>% filter(!is.na(p_class2), #!is.na(just_pension))
+#m_post <- lm(just_pension ~ p_class1 + p_class3 + p_class4, #data = db_reg2)
+library(texreg)
+screenreg(list(m1, m2, m2, m3, m4, m5))
+screenreg(list(m6))
+```
+
+
+```{r}
+#| label: fig-reg
+#| out-width: '80%'
+#| fig-asp: 0.8
+#| fig-cap: "Market justice preferences in pensions by latent class of meritocracy (MAP model)"
+#| fig-cap-location: top
 
 coef_df <-
-  broom::tidy(m_map, conf.int = TRUE) %>%
+  broom::tidy(m1, conf.int = TRUE) %>%
     mutate(model = "MAP (dummies; ref=Class 4)") %>%
     filter(term != "(Intercept)") %>%
     mutate(
       contrast = case_when(
-        term == "class_hat1" ~ "Class 1 vs 2",
-        term == "class_hat3" ~ "Class 3 vs 2",
-        term == "class_hat4" ~ "Class 4 vs 2",
+        term == "class_hat1" ~ "Class 1 vs 4",
+        term == "class_hat2" ~ "Class 2 vs 4",
+        term == "class_hat3" ~ "Class 3 vs 4",
         TRUE ~ term
       )) %>%
   mutate(
-    contrast = factor(contrast, levels = c("Class 1 vs 2", "Class 3 vs 2", "Class 4 vs 2"))
+    contrast = factor(contrast, levels = c("Class 1 vs 4", "Class 2 vs 4", "Class 3 vs 4"))
   )
 
 ggplot(coef_df, aes(x = estimate, y = contrast)) +
@@ -696,4 +746,72 @@ ggplot(coef_df, aes(x = estimate, y = contrast)) +
   labs(x = "Coefficient (OLS) with 95% CI", y = NULL) +
   theme(text = element_text(size = 14))
 ```
+
+
+```{r}
+#| label: fig-reg2
+#| out-width: '80%'
+#| fig-asp: 0.8
+#| fig-cap: "Market justice preferences in pensions by latent class of meritocracy and covariates (MAP model)"
+#| fig-cap-location: top
+
+coef_df <-
+  broom::tidy(m5, conf.int = TRUE) %>%
+    mutate(model = "MAP (dummies; ref=Class 4)") %>%
+    filter(term != "(Intercept)") %>%
+    mutate(
+      contrast = case_when(
+        term == "class_hat1" ~ "Class 1 vs 4",
+        term == "class_hat2" ~ "Class 2 vs 4",
+        term == "class_hat3" ~ "Class 3 vs 4",
+        
+        term == "sex2" ~ "Female (Ref.= Male)",
+        term == "educ" ~ "Education (in years)",
+        term == "age" ~ "Age",
+        term == "income_4Medio-bajo" ~ "Income Middle-Low",
+        term == "income_4Medio-alto" ~ "Income Middle-High",
+        term == "income_4Alto" ~ "Income High",           
+        TRUE ~ term
+      )) 
+
+ggplot(coef_df, aes(x = estimate, y = contrast)) +
+  geom_vline(xintercept = 0, linewidth = 0.7, color = "grey60", linetype = "dashed") +
+  geom_pointrange(aes(xmin = conf.low, xmax = conf.high), fatten = 2, 
+                  size = 1, color = "#ca1137") + 
+  labs(x = "Coefficient (OLS) with 95% CI", y = NULL) +
+  theme(text = element_text(size = 14))
+```
+
+```{r}
+#| label: fig-reg3
+#| out-width: '80%'
+#| fig-asp: 0.8
+#| fig-cap: "Interaction between latent class of meritocracy and income on market justice preferences in pensions"
+#| fig-cap-location: top
+
+coef_df <-
+  broom::tidy(m6, conf.int = TRUE) %>%
+    slice_tail(n=9) %>%
+    mutate(
+      contrast = case_when(
+        term == "class_hat1" ~ "Class 1 vs 4",
+        term == "class_hat2" ~ "Class 2 vs 4",
+        term == "class_hat3" ~ "Class 3 vs 4",
+        term == "sex2" ~ "Female (Ref.= Male)",
+        term == "educ" ~ "Education (in years)",
+        term == "age" ~ "Age",
+        term == "income_4Medio-bajo" ~ "Income Middle-Low",
+        term == "income_4Medio-alto" ~ "Income Middle-High",
+        term == "income_4Alto" ~ "Income High",           
+        TRUE ~ term
+      )) 
+
+ggplot(coef_df, aes(x = estimate, y = contrast)) +
+  geom_vline(xintercept = 0, linewidth = 0.7, color = "grey60", linetype = "dashed") +
+  geom_pointrange(aes(xmin = conf.low, xmax = conf.high), fatten = 2, 
+                  size = 1, color = "#ca1137") + 
+  labs(x = "Coefficient (OLS) with 95% CI", y = NULL) +
+  theme(text = element_text(size = 14))
+```
+
 
