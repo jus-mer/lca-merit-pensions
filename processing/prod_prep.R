@@ -45,17 +45,26 @@ db <- data %>%
                 income = carac_a10, 
                 age = screen_age,
                 sex = screen_sex,
-                educ = screen_education) %>% 
+                educ = screen_education,
+                pol = carac_a08) %>% 
   mutate(id = 1:nrow(.)) %>% 
   as_tibble()
 
 # recode and transform ----
 
+vars_m <- c("perc_effort",
+            "perc_talent",
+            "perc_rich_parents",
+            "perc_contact",
+            "pref_effort",
+            "pref_talent",
+            "pref_rich_parents",
+            "pref_contact")
 # set nas values
 db <- db %>% 
   mutate(
     across(
-      .cols = -c(id, age),
+      .cols = all_of(vars_m),
       .fns = ~ set_na(., na = c(5,6))
     )
   )
@@ -98,15 +107,14 @@ labels1 <- c("Strongly desagree" = 1,
              "Agree" = 3, 
              "Strongly agree" = 4)
 db <- db %>% 
-  mutate_at(.vars = (1:8),.funs = ~ sjlabelled::set_labels(., labels = labels1))
+  mutate_at(.vars = all_of(vars_m),.funs = ~ sjlabelled::set_labels(., labels = labels1))
 
 db <- db %>% 
   mutate(across(
-    1:8,
+    all_of(vars_m),
     ~ if_else(. >= 3, 1, 0),
     .names = "{.col}_d"   # perc_effort -> perc_effort_d, etc.
   ))
-
 
 db <- db %>% 
   mutate(
@@ -115,7 +123,7 @@ db <- db %>%
   )
 
 db <- db %>% 
-  mutate_at(.vars = 1:8,
+  mutate_at(.vars = all_of(vars_m),
             .funs = ~ factor(., 
                              levels = 1:4, 
                              labels = c("Strongly desagree",
@@ -125,10 +133,13 @@ db <- db %>%
 
 
 db <- db %>% 
-  mutate_at(.vars = 16:23,
-            .funs = ~ factor(., 
-                             levels = 0:1, 
-                             labels = c("Low", "High")))
+  mutate(
+    across(
+      ends_with("_d"),
+      .fns = ~ factor(., 
+                       levels = 0:1, 
+                       labels = c("Low", "High"))))
+   
 
 # market justice pensions
 
@@ -141,6 +152,19 @@ db$just_pension <- factor(db$just_pension, levels = 1:4,
                                      "Desagree",                  
                                      "Agree",                     
                                      "Strongly agree"))
+
+# political ideology
+frq(db$pol)
+
+db <- db %>% 
+  mutate(
+    pol = case_when(pol %in% c(1,2) ~ "Right",
+                    pol == 3 ~ "Center",
+                    pol %in% c(4,5) ~ "Left",
+                    pol%in% c(6,7) ~ "Does not identify",
+                    TRUE ~ NA_character_),
+    pol = factor(pol, levels = c("Left", "Center", "Right", "Does not identify"))
+  )
 
 # missings ----
 
@@ -216,6 +240,6 @@ db$pref_contact_d <- sjlabelled::set_label(db$pref_contact_d,
 # 4. Save and export ------------------------------------------------------
 
 db <- db %>% 
-  dplyr::select(id, just_pension, starts_with(c("perc", "pref")), age, sex, educ, income)
+  dplyr::select(id, just_pension, starts_with(c("perc", "pref")), age, sex, educ, income, pol)
 
 save(db, file = here("input/data/proc/db_proc.RData"))
