@@ -46,7 +46,9 @@ db <- data %>%
                 age = screen_age,
                 sex = screen_sex,
                 educ = screen_education,
-                pol = carac_a08) %>% 
+                pol = carac_a08,
+                just_educ = des_09,
+                just_healthcare = des_10) %>% 
   mutate(id = 1:nrow(.)) %>% 
   as_tibble()
 
@@ -166,6 +168,31 @@ db <- db %>%
     pol = factor(pol, levels = c("Left", "Center", "Right", "Does not identify"))
   )
 
+
+# market justice education
+
+frq(db$just_educ)
+
+db$just_educ <- sjlabelled::set_labels(db$just_educ, labels = labels1)
+
+db$just_educ <- factor(db$just_educ, levels = 1:4, 
+                          labels = c("Strongly desagree",
+                                     "Desagree",                  
+                                     "Agree",                     
+                                     "Strongly agree"))
+
+# market justice healthcare
+
+frq(db$just_healthcare)
+
+db$just_healthcare <- sjlabelled::set_labels(db$just_healthcare, labels = labels1)
+
+db$just_healthcare <- factor(db$just_healthcare, levels = 1:4, 
+                       labels = c("Strongly desagree",
+                                  "Desagree",                  
+                                  "Agree",                     
+                                  "Strongly agree"))
+
 # missings ----
 
 colSums(is.na(db))
@@ -240,6 +267,6 @@ db$pref_contact_d <- sjlabelled::set_label(db$pref_contact_d,
 # 4. Save and export ------------------------------------------------------
 
 db <- db %>% 
-  dplyr::select(id, just_pension, starts_with(c("perc", "pref")), age, sex, educ, income, pol)
+  dplyr::select(id, just_pension, starts_with(c("perc", "pref")), age, sex, educ, income, pol, just_educ, just_healthcare)
 
 save(db, file = here("input/data/proc/db_proc.RData"))
