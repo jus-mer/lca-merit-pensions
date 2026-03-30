@@ -1,7 +1,31 @@
 ---
-title: "Data analysis"
-subtitle: "Latent class analysis of the meritocracy scale"
-author: "Andreas Laffert"
+title: "Latent Class Analysis of Meritocratic Beliefs"
+subtitle: "Data analysis"
+author:
+  - name: Andreas Laffert
+    corresponding: true
+    orcid: 0000-0002-9008-2454
+    email: alaffertt@estudiante.uc.cl 
+    affiliations:
+      - ref: 1
+  - name: Juan Carlos Castillo
+    orcid: 0000-0003-1265-7854
+    email: juancastillov@uchile.cl
+    affiliations:
+      - ref: 1
+  - name: Tomás Urzúa
+    orcid: 0009-0008-3167-6819
+    email: tomas.urzua@ug.chile.cl
+    affiliations:
+      - ref: 1    
+  - name: René Canales
+    orcid: 0009-0002-4299-2725
+    email: renecanales@uc.cl
+    affiliations:
+      - ref: 1  
+affiliations: 
+  - id: 1
+    name: Department of Sociology, University of Chile
 date: today
 lang: en
 fontsize: 12pt
@@ -23,11 +47,10 @@ format:
     title-block-banner: true
 editor_options: 
   chunk_output_type: console
+bibliography: "../input/bib/jusmer.bib"
+csl: "../input/bib/apa6.csl"
 ---
 
-# Presentation
-
-This is the analysis code for the future paper related to a latent class analysis of the meritocracy scale. The dataset used is `db_proc.RData` generated in the `prod_prep.R`  script.
 
 ```{r}
 #| label: set
@@ -52,6 +75,136 @@ table_format2 <- if(is_html_output()) {
 options(kableExtra.html.bsTable = T)
 options(knitr.kable.NA = "")
 ```
+
+# Aim
+
+This study applies latent class analysis (LCA) to a multidimensional scale of meritocratic beliefs developed by  @castillo_multidimensional_2023 to identify distinct latent profiles of how individuals combine meritocratic and non-meritocratic beliefs.
+
+Rather than focusing on validating the measurement model, the analysis seeks to uncover patterns of response configurations across items, thereby identifying underlying typologies of meritocratic orientations.
+
+The dataset used is `db_proc.RData` generated in the `prod_prep.R` script.
+
+# Data
+
+- Dataset: EDUMERCO (2025)
+- Mode: Online survey (CAWI)
+- Population: Adults in the Metropolitan Region of Chile
+- Sampling: Non-probability quota-based design
+  - Quotas based on age, gender, education, and socioeconomic status
+- Sample size: N = 3,470
+- Analytical sample: N = 2,740
+
+# Measures
+
+## Meritocracy scale
+
+We use a multidimensional scale that distinguishes between (@tbl-merit):
+
+1. Perceptions and preferences
+2. Meritocratic and non-meritocratic principles
+
+This results in four dimensions:
+
+- Perceived meritocracy: beliefs about whether effort and ability are rewarded
+- Perceived non-meritocracy: beliefs about the role of connections and family wealth
+- Preference for meritocracy: normative support for rewarding effort and talent
+- Preference for non-meritocracy: normative acceptance of advantages linked to privilege
+
+Each dimension is measured with two items, for a total of eight items. Responses are recorded on a four-point Likert scale ranging from *strongly disagree* (1) to *strongly agree* (4).
+
+
+
+```{r}
+#| tbl-cap: Items for perceptions and preferences for meritocracy scale
+#| tbl-cap-location: top
+#| echo: false
+#| label: tbl-merit
+
+ # remotes::install_github('haozhu233/kableExtra@a6af5c0')  # for problems with collapse_rows()
+ pacman::p_load(knitr, kableExtra, dplyr, here)
+ table_format = if (knitr::is_html_output()) {
+   #conditional instructions for kable
+   "html" #if html set "html" in format
+ } else if (knitr::is_latex_output()) {
+   "latex"#if latex set "latex" in format
+ }
+ tabitems <- read.csv(file = here("input/table-01.csv"),header = 1,sep = ",",encoding = "UTF-8") # call file  generated externally for the table
+ cnames <- c("Components", "Dimensions","Item (English)" , "Item original (Spanish)")
+
+ knitr::kable(tabitems, "html", booktabs = T, linesep = "",col.names = cnames) %>%
+   kableExtra::kable_styling(
+     full_width = T,
+     latex_options = c("hold_position"),
+     position = "center",
+     font_size = 9.5,
+     bootstrap_options=c("striped", "bordered")) %>%
+   kableExtra::column_spec(column = 1, width = "2cm", ) %>%
+   kableExtra::column_spec(column = 2,width = "2 cm") %>%
+   kableExtra::collapse_rows(columns = 1:2,valign = "middle")
+```
+
+
+# Method
+
+## Latent class analysis
+
+Latent class analysis (LCA) is a statistical method that models associations among observed variables by assuming that an unobserved categorical latent variable explains their underlying structure. This latent variable represents discrete subgroups within the population, where individuals in the same class share similar response patterns.
+
+LCA is especially appropriate for categorical and ordinal indicators, such as Likert-scale items.
+
+### Analytical purpose
+
+LCA can serve both exploratory and confirmatory purposes.
+
+- As an exploratory technique, it identifies latent typologies of belief configurations.
+- As a confirmatory technique, it allows researchers to test hypotheses about heterogeneity in the population.
+
+Substantively, LCA enables the derivation of empirically grounded ideal types of meritocratic orientations.
+
+### Key assumptions
+
+- Each individual belongs to one latent class.
+- Individuals within the same class share similar response probabilities.
+- Observed indicators are conditionally independent once class membership is taken into account (local independence).
+
+### Model parameters
+
+The model estimates two main sets of parameters:
+
+1. Class probabilities  
+   These indicate the probability of belonging to each latent class and reflect the relative size of each group in the population.
+
+2. Conditional response probabilities  
+   These indicate the probability of endorsing a particular response category, given membership in a latent class. These parameters are used to interpret and label the classes.
+
+## Interpretation
+
+Latent classes are defined by distinct response profiles across the eight items. These profiles capture different combinations of:
+
+- meritocratic and non-meritocratic beliefs
+- perceptions and normative preferences
+
+This allows us to identify complex belief systems in which individuals may, for example, endorse meritocratic ideals while simultaneously recognizing, or even accepting, non-meritocratic advantages.
+
+## Model estimation and fit
+
+Models are estimated iteratively by increasing the number of classes.
+
+Model selection is based primarily on standard fit criteria, especially:
+
+- Bayesian Information Criterion (BIC)
+- Akaike Information Criterion (AIC)
+
+Lower values indicate a better fit, while also balancing model complexity and parsimony.
+
+## Contribution
+
+This strategy shifts the analysis from a variable-centered approach to a person-centered one. In doing so, it allows us to:
+
+- capture heterogeneity in meritocratic belief systems
+- identify meaningful subgroups of respondents
+- examine how meritocratic and non-meritocratic beliefs coexist within individuals
+
 
 
 # Libraries
@@ -90,14 +243,57 @@ load(here("input/data/proc/db_proc.RData"))
 
 glimpse(db)
 
+db <- db %>% 
+  mutate(
+    income_4 = case_when(
+      income %in% c(
+        "Menos de $280.000 mensuales liquidos",
+        "De $280.001 a $380.000 mensuales liquidos",
+        "De $380.001 a $470.000 mensuales liquidos"
+      ) ~ "Low",
+      
+      income %in% c(
+        "De $470.001 a $610.000 mensuales liquidos",
+        "De $610.001 a $730.000 mensuales liquidos"
+      ) ~ "Middle-low",
+      
+      income %in% c(
+        "De $730.001 a $890.000 mensuales liquidos",
+        "De $890.001 a $1.100.000 mensuales liquidos"
+      ) ~ "Middle-high",
+      
+      income %in% c(
+        "De $1.100.001 a $2.700.000 mensuales liquidos",
+        "De $2.700.001 a $4.100.000 mensuales liquidos",
+        "Mas de $4.100.001 mensuales liquidos"
+      ) ~ "High",
+      
+      TRUE ~ NA_character_
+    ),
+    income_4 = factor(income_4, levels = c("Low", "Middle-low", "Middle-high", "High"))
+  )
+
+
+db$income_4 <- sjlabelled::set_label(db$income_4, "Income")
+
+db$age <- sjlabelled::set_label(db$age, "Age")
+
+db$sex <- if_else(db$sex == 1, "Male", "Female")
+
+db$sex <- sjlabelled::set_label(db$sex, "Sex")
+
+db$educ <- sjlabelled::set_label(db$educ, "Educational level")
+
+
+db$pol <- sjlabelled::set_label(db$pol, "Political identification")
+
+
 
 ```
 
 # Analysis
 
 ## Descriptives
-
-
 
 ```{r}
 #| label: tbl-summary1
@@ -114,7 +310,7 @@ vars_m <- c("perc_effort",
             "pref_contact")
 
 t1 <- db %>% 
-   dplyr::select(all_of(vars_m), ends_with("_d"))
+   dplyr::select(all_of(vars_m), age, sex, educ, income_4, pol)
 
 
 df<-dfSummary(t1,
@@ -380,6 +576,8 @@ fit_tbl <- data.frame(
 fit_tbl
 ```
 
+We estimated latent class models with one to five classes. Model fit improved monotonically as the number of classes increased, as indicated by decreasing AIC and BIC values and statistically significant likelihood-ratio tests at each step (@tbl-fit).
+
 ```{r}
 #| label: tbl-fit
 #| tbl-cap: "Fit comparision of latent class models"
@@ -503,9 +701,15 @@ ggplot(delta_long, aes(x = K, y = value, group = delta)) +
 
 
 
+However, the incremental improvement in fit became substantially smaller after the four-class solution. Whereas the transition from one to four classes yielded large reductions in AIC and BIC, the five-class model provided only a modest additional improvement (AIC = 20,249.6; BIC = 20,509.9) relative to the four-class solution (AIC = 20,395.7; BIC = 20,602.7). Thus, although the five-class model fit the data slightly better in statistical terms, the gain was comparatively limited.
+
+We therefore retained the four-class solution as the final model. This choice was guided by both statistical and substantive criteria: the four-class model achieved a strong balance between goodness of fit, parsimony, and interpretability, whereas the five-class solution did not yield enough additional differentiation to justify the increase in complexity.
+
 ## Four latent class model
 
+The @tbl-prevalence shows the conditional probabilities of each item associated with a latent class and their respective sizes. The four-class solution suggests that respondents are not primarily differentiated along a simple continuum from “more meritocratic” to “less meritocratic.” Instead, the latent classes are organized by distinct combinations of: (1) perceptions of meritocracy, (2) perceptions of non-meritocratic advantage, and (3) normative preferences regarding whether merit or privilege should determine success. As such, the results reveal heterogeneity not only in empirical diagnoses of how society works, but also in normative evaluations of whether these mechanisms are considered acceptable. This interpretation is consistent with the item-response profiles across classes.
 
+Two broader patterns structure the class solution. First, perceptions of non-meritocratic advantage are high across most classes, particularly regarding the role of wealthy parents and personal connections, suggesting that recognition of privilege is widespread. Second, the main line of differentiation lies in normative preferences toward non-meritocratic advantage. In other words, the classes differ less in whether they perceive privilege and more in whether they consider such privilege legitimate or acceptable.
 ```{r}
 #| label: fig-prob
 #| out-width: '80%'
@@ -555,41 +759,34 @@ p_endorse <- p_endorse %>%
                          ),
     variable = factor(variable,
                       levels = c("perc_effort",
-"perc_talent",
-"perc_rich_parents",
-"perc_contacts",
-"pref_effort",
-"pref_talent",
-"pref_rich_parents",
-"pref_contacts")))
+                                 "perc_talent",
+                                 "perc_rich_parents",
+                                 "perc_contacts",
+                                 "pref_effort",
+                                 "pref_talent",
+                                 "pref_rich_parents",
+                                 "pref_contacts")))
 
-ggplot(p_endorse, aes(x = variable, y = p, group = factor(class), colour = factor(class))) +
+p_endorse <- p_endorse %>% 
+  mutate(class = factor(class),
+         p = round(p,2))
+
+g_class <- ggplot(p_endorse, aes(x = variable, y = p, group = class, colour = class)) +
   geom_line(linewidth = 0.7) +
-  geom_point(size = 2) +
+  geom_point(size = 2) +  
+  MetBrewer::scale_color_met_d("VanGogh2") +
   coord_cartesian(ylim = c(0, 1)) +
   labs(x = "Item", y = paste0("P(Y = ", "High", " | class)"), group = "Class", colour = "Class") +
-  theme(legend.position = "bottom",
+  theme(legend.position = "top",
         text = element_text(size = 14),
         axis.text.x = element_text(angle = 70, vjust = 1, hjust = 1))
 
+
+library(plotly)
+
+ggplotly(g_class)
 ```
 
-```{r}
-#| label: fig-heat
-#| out-width: '80%'
-#| fig-asp: 0.8
-#| fig-cap: "Heatmap of endorsement"
-#| fig-cap-location: top
-
-# 6) Plot: heatmap (good for papers)
-ggplot(p_endorse, aes(x = variable, y = factor(class), fill = p)) +
-  geom_tile() +
-  coord_cartesian(xlim = NULL) +
-  labs(x = "Item", y = "Class", fill = paste0("P(Y=", "High", ")")) +
-  theme(legend.position = "right",
-        text = element_text(size = 14),
-        axis.text.x = element_text(angle = 70, vjust = 1, hjust = 1))
-```
 
 ```{r}
 #| label: tbl-prevalence
@@ -631,15 +828,42 @@ report_probs2[,-c(1)] %>%
                             font_size = 23)
 ```
 
-The @tbl-prevalence shows the conditional probabilities of each item associated with a latent class and their respective sizes. Class one has a size of 36.3% and shows low probabilities of perceiving meritocratic norms in society, while it highly perceives non-meritocratic functions. In addition, there is a high preference for both meritocratic and non-meritocratic elements, with talent being the only factor that deviates slightly from this pattern. In short, this class does not perceive a meritocratic functioning in society, and at the same time adheres to both meritocratic and non-meritocratic factors. This class is referred to as “**Anything goes preferences**.”
 
-In the second class, there is a high perception of meritocratic elements and conditions of origin at the societal level. On the other hand, there is a strong preference for effort and talent, which differs from a lower adherence to non-meritocratic rules. In this case, there is a panoramic view of how society works, where effort and talent coexist with non-meritocratic functions; however, people prefer to be rewarded primarily for their merit. This group includes “**Meritocratic believers with a broad perspective**.”
 
-The fourth class shows almost no perception of meritocratic norms in society, while perceiving a social order mainly governed by conditions of origin. In relation to this, preferences show a high adherence to the idea that society should function on the basis of meritocratic elements (although effort rather than talent), but having rich parents and good contacts should not influence the distribution of rewards in society. In this context, there is a clear narrative where, perceiving that society operates on the basis of non-meritocratic elements, there is a preference for meritocracy to come into play. This class is designated as “**Radical meritocrats**.”
+**Class 1: Legitimation of Privilege under Structural Realism (36.3%)**
 
-# Regression anlaysis
+The first class is characterized by low perceived meritocracy and very high perceived non-meritocracy. Respondents in this group do not believe that effort or talent are strongly rewarded, but they do strongly believe that family wealth and social contacts shape life chances. At the same time, they express high support for rewarding effort and talent, yet also show high normative acceptance of advantages linked to wealthy parents and personal networks.
+
+Substantively, this class combines a realistic diagnosis of a socially stratified system with a normative legitimation of privilege. These respondents do not merely recognize that success is shaped by inherited or relational advantages; they also appear to accept that this is appropriate. Importantly, their endorsement of meritocratic rewards does not operate as a moral alternative to privilege, but rather coexists with it. This suggests a dual normative orientation in which merit and privilege are not seen as contradictory principles, but as compatible bases of social inequality.
+
+**Class 2: Structurally Aware Meritocrats (20.7%)**
+
+The second class displays very high levels of both perceived meritocracy and perceived non-meritocracy. Respondents in this group strongly believe that effort and talent are rewarded, while also recognizing the importance of wealthy parents and social contacts. Normatively, they express very strong support for meritocratic rewards, but only moderate acceptance of non-meritocratic advantages.
+
+This profile suggests a belief system in which merit and privilege are understood as operating simultaneously. These respondents do not deny the role of structural advantage, yet neither do they reject the view that effort and talent matter. Normatively, they strongly endorse meritocracy, while showing a more ambivalent stance toward privilege. Compared to Class 1, they are less willing to legitimize inherited or network-based advantage, but they do not reject it entirely. This class can therefore be interpreted as one that sees the system as at least partially meritocratic and broadly considers this arrangement acceptable.
+
+**Class 3: Weakly Structured or Ambivalent Orientations (6.8%)**
+
+The third class is the smallest and least clearly structured. It is characterized by moderate levels of perceived meritocracy, low levels of perceived non-meritocracy, moderate support for meritocratic rewards, and relatively low support for non-meritocratic advantages. Unlike the other classes, respondents in this group do not strongly perceive either merit or privilege as dominant mechanisms of success.
+
+Substantively, this class appears to represent a more ambivalent or weakly articulated orientation. Its members neither strongly endorse meritocratic ideals nor strongly perceive the system as dominated by privilege. Likewise, they do not express a strong normative defense of non-meritocratic advantage. Given its small size, this class should be interpreted with caution and evaluated for stability across specifications. Still, it may capture respondents whose views are less ideologically crystallized or whose understanding of success is not organized around the dominant opposition between merit and privilege.
+
+**Class 4: Critical Meritocrats (36.2%)**
+
+The fourth class combines low perceived meritocracy with very high perceived non-meritocracy. Respondents in this group do not believe that effort and talent are what society actually rewards, but they strongly believe that wealthy parents and social contacts shape success. Normatively, however, they strongly support meritocratic rewards and sharply reject the legitimacy of non-meritocratic advantages, especially those associated with personal networks.
+
+This class is particularly important substantively because it captures a configuration in which meritocracy is upheld as a moral ideal while privilege is recognized as an empirical reality. In this sense, respondents in this group clearly distinguish between how society works and how it should work. They do not perceive the current system as meritocratic, but they do express strong support for a society in which effort and talent, rather than inherited or relational advantages, determine success. This class illustrates the analytical value of distinguishing perceptions from preferences, since older one-dimensional approaches to meritocratic beliefs would likely obscure this tension between normative commitment to merit and critical awareness of privilege.
+
+**Overall Interpretation**
+
+Taken together, the latent class solution suggests that meritocratic beliefs are best understood as multidimensional and internally heterogeneous. The main contrast is not between those who believe in meritocracy and those who do not, but between different ways of combining empirical perceptions of inequality with normative judgments about its legitimacy. Put differently, the classes vary across two central axes: first, whether respondents perceive success as driven by merit or by privilege; and second, whether they consider these mechanisms normatively acceptable.
+
+This framework helps clarify the broader structure of the results. Class 2 combines recognition of both merit and privilege with strong support for meritocratic rewards and moderate tolerance of privilege. Class 4 combines recognition of privilege with a clear normative rejection of it, while maintaining strong support for merit as an ideal. Class 1 shares with Class 4 a critical diagnosis of how society works, but differs sharply in its normative legitimization of privilege. Finally, Class 3 stands apart as a smaller and less clearly structured group with comparatively weak commitments on both the perceptual and normative dimensions. Overall, the results show that support for meritocracy does not necessarily imply denial of privilege, and that recognition of privilege does not necessarily entail its rejection. This is precisely the kind of complexity that a person-centered latent class approach is able to recover.
+
+
 
 ```{r}
+#| eval: false
 #| include: false
 
 fit4 <- fits[[4]]
@@ -667,37 +891,7 @@ max_p <- apply(P, 1, max)
 #quantile(max_p, c(.1, .25, .5, .75, .9))
 
 # MAP (ref=2)
-db_reg1 <- db_full %>% filter(!is.na(class_hat), !is.na(just_pension), !is.na(age), !is.na(sex), !is.na(educ), !is.na(income))
-
-db_reg1 <- db_reg1 %>% 
-  mutate(
-    income_4 = case_when(
-      income %in% c(
-        "Menos de $280.000 mensuales liquidos",
-        "De $280.001 a $380.000 mensuales liquidos",
-        "De $380.001 a $470.000 mensuales liquidos"
-      ) ~ "Bajo",
-      
-      income %in% c(
-        "De $470.001 a $610.000 mensuales liquidos",
-        "De $610.001 a $730.000 mensuales liquidos"
-      ) ~ "Medio-bajo",
-      
-      income %in% c(
-        "De $730.001 a $890.000 mensuales liquidos",
-        "De $890.001 a $1.100.000 mensuales liquidos"
-      ) ~ "Medio-alto",
-      
-      income %in% c(
-        "De $1.100.001 a $2.700.000 mensuales liquidos",
-        "De $2.700.001 a $4.100.000 mensuales liquidos",
-        "Mas de $4.100.001 mensuales liquidos"
-      ) ~ "Alto",
-      
-      TRUE ~ NA_character_
-    ),
-    income_4 = factor(income_4, levels = c("Bajo", "Medio-bajo", "Medio-alto", "Alto"))
-  )
+db_reg1 <- db_full %>% filter(!is.na(class_hat), !is.na(just_pension), !is.na(age), !is.na(sex), !is.na(educ), !is.na(income_4))
 
 db_reg1$class_hat <- relevel(db_reg1$class_hat, ref = "4")
 
@@ -723,6 +917,8 @@ screenreg(list(m6))
 #| fig-asp: 0.8
 #| fig-cap: "Market justice preferences in pensions by latent class of meritocracy (MAP model)"
 #| fig-cap-location: top
+#| eval: false
+#| include: false
 
 coef_df <-
   broom::tidy(m1, conf.int = TRUE) %>%
@@ -754,6 +950,8 @@ ggplot(coef_df, aes(x = estimate, y = contrast)) +
 #| fig-asp: 0.8
 #| fig-cap: "Market justice preferences in pensions by latent class of meritocracy and covariates (MAP model)"
 #| fig-cap-location: top
+#| eval: false
+#| include: false
 
 coef_df <-
   broom::tidy(m5, conf.int = TRUE) %>%
@@ -788,6 +986,8 @@ ggplot(coef_df, aes(x = estimate, y = contrast)) +
 #| fig-asp: 0.8
 #| fig-cap: "Interaction between latent class of meritocracy and income on market justice preferences in pensions"
 #| fig-cap-location: top
+#| eval: false
+#| include: false
 
 coef_df <-
   broom::tidy(m6, conf.int = TRUE) %>%
