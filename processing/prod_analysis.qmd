@@ -280,6 +280,8 @@ db$age <- sjlabelled::set_label(db$age, "Age")
 
 db$sex <- if_else(db$sex == 1, "Male", "Female")
 
+db$sex <- factor(db$sex, levels = c("Male", "Female"))
+
 db$sex <- sjlabelled::set_label(db$sex, "Sex")
 
 db$educ <- sjlabelled::set_label(db$educ, "Educational level")
@@ -862,8 +864,15 @@ This framework helps clarify the broader structure of the results. Class 2 combi
 
 
 
+
+# Additional analysis
+
+This is a section for pending tasks, where we include additional analyses that are currently in the exploratory phase.
+
+## Regression anlaysis
+
+Here, we will use the probability of belonging to each class as an independent variable that predicts the outcome of market fairness in pensions, in addition to including covariates such as age, gender, education, income, and political affiliation. Finally, we include interaction terms between income and market fairness in pensions.
 ```{r}
-#| eval: false
 #| include: false
 
 fit4 <- fits[[4]]
@@ -871,7 +880,7 @@ fit4 <- fits[[4]]
 post <- as.data.frame(fit4$posterior)
 names(post) <- paste0("p_class", 1:4)
 
-class_df <- na.omit(db_lca) %>%
+class_df <- db_lca %>%
   dplyr::select(id) %>%
   bind_cols(post) %>%
   mutate(
@@ -891,7 +900,8 @@ max_p <- apply(P, 1, max)
 #quantile(max_p, c(.1, .25, .5, .75, .9))
 
 # MAP (ref=2)
-db_reg1 <- db_full %>% filter(!is.na(class_hat), !is.na(just_pension), !is.na(age), !is.na(sex), !is.na(educ), !is.na(income_4))
+db_reg1 <- db_full %>% filter(!is.na(class_hat), !is.na(just_pension), !is.na(age), !is.na(sex), !is.na(educ), !is.na(income))
+
 
 db_reg1$class_hat <- relevel(db_reg1$class_hat, ref = "4")
 
@@ -917,8 +927,6 @@ screenreg(list(m6))
 #| fig-asp: 0.8
 #| fig-cap: "Market justice preferences in pensions by latent class of meritocracy (MAP model)"
 #| fig-cap-location: top
-#| eval: false
-#| include: false
 
 coef_df <-
   broom::tidy(m1, conf.int = TRUE) %>%
@@ -935,10 +943,20 @@ coef_df <-
     contrast = factor(contrast, levels = c("Class 1 vs 4", "Class 2 vs 4", "Class 3 vs 4"))
   )
 
-ggplot(coef_df, aes(x = estimate, y = contrast)) +
+coef_df <- coef_df %>%
+  mutate(sign = if_else(estimate < 0, "negative", "positive"))
+
+ggplot(coef_df, aes(x = estimate, y = contrast, color = sign)) +
   geom_vline(xintercept = 0, linewidth = 0.7, color = "grey60", linetype = "dashed") +
-  geom_pointrange(aes(xmin = conf.low, xmax = conf.high), fatten = 2, 
-                  size = 1, color = "#ca1137") + 
+  geom_pointrange(
+    aes(xmin = conf.low, xmax = conf.high),
+    fatten = 2,
+    size = 1
+  ) +
+  scale_color_manual(
+    values = c("negative" = "black", "positive" = "#ca1137"),
+    guide = "none"
+  ) +
   labs(x = "Coefficient (OLS) with 95% CI", y = NULL) +
   theme(text = element_text(size = 14))
 ```
@@ -950,8 +968,6 @@ ggplot(coef_df, aes(x = estimate, y = contrast)) +
 #| fig-asp: 0.8
 #| fig-cap: "Market justice preferences in pensions by latent class of meritocracy and covariates (MAP model)"
 #| fig-cap-location: top
-#| eval: false
-#| include: false
 
 coef_df <-
   broom::tidy(m5, conf.int = TRUE) %>%
@@ -963,19 +979,29 @@ coef_df <-
         term == "class_hat2" ~ "Class 2 vs 4",
         term == "class_hat3" ~ "Class 3 vs 4",
         
-        term == "sex2" ~ "Female (Ref.= Male)",
+        term == "sexFemale" ~ "Female (Ref.= Male)",
         term == "educ" ~ "Education (in years)",
         term == "age" ~ "Age",
-        term == "income_4Medio-bajo" ~ "Income Middle-Low",
-        term == "income_4Medio-alto" ~ "Income Middle-High",
-        term == "income_4Alto" ~ "Income High",           
+        term == "income_4Middle-low" ~ "Income Middle-Low",
+        term == "income_4Middle-high" ~ "Income Middle-High",
+        term == "income_4High" ~ "Income High",           
         TRUE ~ term
       )) 
 
-ggplot(coef_df, aes(x = estimate, y = contrast)) +
+coef_df <- coef_df %>%
+  mutate(sign = if_else(estimate < 0, "negative", "positive"))
+
+ggplot(coef_df, aes(x = estimate, y = contrast, color = sign)) +
   geom_vline(xintercept = 0, linewidth = 0.7, color = "grey60", linetype = "dashed") +
-  geom_pointrange(aes(xmin = conf.low, xmax = conf.high), fatten = 2, 
-                  size = 1, color = "#ca1137") + 
+  geom_pointrange(
+    aes(xmin = conf.low, xmax = conf.high),
+    fatten = 2,
+    size = 1
+  ) +
+  scale_color_manual(
+    values = c("negative" = "black", "positive" = "#ca1137"),
+    guide = "none"
+  ) +
   labs(x = "Coefficient (OLS) with 95% CI", y = NULL) +
   theme(text = element_text(size = 14))
 ```
@@ -986,32 +1012,120 @@ ggplot(coef_df, aes(x = estimate, y = contrast)) +
 #| fig-asp: 0.8
 #| fig-cap: "Interaction between latent class of meritocracy and income on market justice preferences in pensions"
 #| fig-cap-location: top
-#| eval: false
-#| include: false
 
 coef_df <-
   broom::tidy(m6, conf.int = TRUE) %>%
     slice_tail(n=9) %>%
     mutate(
       contrast = case_when(
-        term == "class_hat1" ~ "Class 1 vs 4",
-        term == "class_hat2" ~ "Class 2 vs 4",
-        term == "class_hat3" ~ "Class 3 vs 4",
-        term == "sex2" ~ "Female (Ref.= Male)",
-        term == "educ" ~ "Education (in years)",
-        term == "age" ~ "Age",
-        term == "income_4Medio-bajo" ~ "Income Middle-Low",
-        term == "income_4Medio-alto" ~ "Income Middle-High",
-        term == "income_4Alto" ~ "Income High",           
+        term == "class_hat1:income_4Middle-low" ~ "Class 1 x Income Middle-Low",
+        term == "class_hat2:income_4Middle-low" ~ "Class 2 x Income Middle-Low",
+        term == "class_hat3:income_4Middle-low" ~ "Class 3 x Income Middle-Low", 
+        
+        term == "class_hat1:income_4Middle-high" ~ "Class 1 x Income Middle-High",
+        term == "class_hat2:income_4Middle-high" ~ "Class 2 x Income Middle-High",
+        term == "class_hat3:income_4Middle-high" ~ "Class 3 x Income Middle-High",  
+        
+        term == "class_hat1:income_4High" ~ "Class 1 x Income High",
+        term == "class_hat2:income_4High" ~ "Class 2 x Income High",
+        term == "class_hat3:income_4High" ~ "Class 3 x Income High", 
         TRUE ~ term
       )) 
 
-ggplot(coef_df, aes(x = estimate, y = contrast)) +
+coef_df <- coef_df %>%
+  mutate(sign = if_else(estimate < 0, "negative", "positive"))
+
+ggplot(coef_df, aes(x = estimate, y = contrast, color = sign)) +
   geom_vline(xintercept = 0, linewidth = 0.7, color = "grey60", linetype = "dashed") +
-  geom_pointrange(aes(xmin = conf.low, xmax = conf.high), fatten = 2, 
-                  size = 1, color = "#ca1137") + 
+  geom_pointrange(
+    aes(xmin = conf.low, xmax = conf.high),
+    fatten = 2,
+    size = 1
+  ) +
+  scale_color_manual(
+    values = c("negative" = "black", "positive" = "#ca1137"),
+    guide = "none"
+  ) +
   labs(x = "Coefficient (OLS) with 95% CI", y = NULL) +
   theme(text = element_text(size = 14))
 ```
 
+## SEM framework
+
+
+In this analysis, we will use a structural equation modeling framework to estimate the latent structure of the meritocracy scale and how its dimensions relate to market justice preferences, which are treated as a latent factor of preferences in the areas of pensions, education, and healthcare. 
+
+```{r}
+#| echo: false
+
+# 3.4 SEM pensions ----
+
+db_sem <- db_full %>% 
+  dplyr::select(just_pension, just_educ, just_healthcare, all_of(vars_m), age, sex, educ, income_4, pol) %>% 
+  drop_na()
+
+db_sem <- db_sem %>% 
+  mutate(
+    across(.cols = starts_with("just"),
+           .fns = ~ as.numeric(.))
+  )
+
+db_sem <- db_sem %>% 
+  mutate(
+    across(
+      .cols = all_of(vars_m),
+      .fns = ~as.numeric(.)
+    ))
+
+# asegurar referencias
+db_sem$income_4 <- relevel(db_sem$income_4, ref = "Low")
+db_sem$pol <- relevel(db_sem$pol, ref = "Left")
+
+# crear dummies
+X_income <- model.matrix(~ income_4, data = db_sem)[, -1, drop = FALSE]
+X_pol    <- model.matrix(~ pol, data = db_sem)[, -1, drop = FALSE]
+
+# unir
+db_sem <- cbind(db_sem, as.data.frame(X_income), as.data.frame(X_pol))
+
+# limpiar nombres
+names(db_sem) <- make.names(names(db_sem))
+
+db_sem$sex_female <- ifelse(db_sem$sex == "Female", 1, 0)
+
+model <- c('
+  # MJP latent factor
+  mjp =~ just_pension + just_educ + just_healthcare
+  
+  # Meritocray latent factors
+  perc_merit =~ perc_effort + perc_talent
+  perc_nmerit =~ perc_rich_parents + perc_contact
+  pref_merit =~ pref_effort + pref_talent
+  pref_nmerit =~ pref_rich_parents + pref_contact
+  
+  # Regression
+  mjp ~ perc_merit + perc_nmerit + pref_merit + pref_nmerit +
+                 age + educ + sex_female +
+                 income_4Middle.low + income_4Middle.high + income_4High +
+                 polCenter + polRight + polDoes.not.identify
+')
+
+ord_vars <- c(
+  "just_pension", "just_educ", "just_healthcare",
+  "perc_effort", "perc_talent",
+  "perc_rich_parents", "perc_contact",
+  "pref_effort", "pref_talent",
+  "pref_rich_parents", "pref_contact"
+)
+
+fit_sem <- lavaan::sem(
+  model,
+  data = db_sem,
+  estimator = "WLSMV",
+  ordered = ord_vars
+)
+
+summary(fit_sem, fit.measures = TRUE, standardized = TRUE, rsquare = TRUE)
+
+```
 
